@@ -1,0 +1,204 @@
+<!-- Single-file HTML page for CampusBot with flying-money background animation -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CampusBot — Campus Info Assistant</title>
+  <style>
+    /* Reset & base */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,-apple-system,"Helvetica Neue",Arial;line-height:1.4;background:#0f172a;overflow:hidden;color:#0b1220}
+
+    /* Flying money background */
+    .money-bg{
+      position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+      background: linear-gradient(180deg,#071233 0%, #0b1a33 55%, rgba(255,255,255,0.02) 100%);
+    }
+    .bill{
+      position:absolute;left:50%;top:100%;will-change:transform,opacity;display:block;
+      transform-origin:center center; font-size:28px;opacity:0.95;
+      text-shadow:0 2px 8px rgba(2,6,23,0.6);
+    }
+
+    /* Different timings & sizes for variety */
+    @keyframes floatUp {
+      0% { transform: translate3d(var(--x,0), 0px, 0) rotate(var(--r,0deg)) scale(var(--s,1)); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translate3d(calc(var(--x,0) + var(--drift, -120px)), -140vh, 0) rotate(calc(var(--r,0deg) + 720deg)) scale(var(--s,1)); opacity: 0; }
+    }
+
+    /* Chat container */
+    .app{
+      position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;
+    }
+    .card{
+      width:100%;max-width:980px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));backdrop-filter: blur(6px);
+      border:1px solid rgba(255,255,255,0.04);box-shadow: 0 10px 35px rgba(2,6,23,0.6);border-radius:18px;padding:18px;display:flex;flex-direction:column;
+    }
+    header{display:flex;align-items:center;justify-content:space-between;padding:10px 6px 18px 6px}
+    header h1{color:#f8fafc;font-size:20px}
+    header .sub{font-size:12px;color:#cbd5e1}
+
+    .chat-area{flex:1;min-height:420px;max-height:62vh;overflow:auto;padding:14px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.02)}
+
+    .msg{margin:10px 0;display:flex}
+    .msg.user{justify-content:flex-end}
+    .bubble{max-width:78%;padding:12px 14px;border-radius:12px;background:#ffffff;color:#071233;box-shadow:0 4px 18px rgba(2,6,23,0.3)}
+    .bubble.user{background:#0ea5a4;color:white}
+    .meta{font-size:11px;color:#94a3b8;margin-bottom:6px}
+
+    .controls{display:flex;gap:8px;padding-top:12px}
+    .controls input[type="text"]{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:#e6eef8}
+    .controls button{padding:10px 14px;border-radius:10px;border:none;background:#06b6d4;color:#042025;font-weight:600;cursor:pointer}
+    .controls button:disabled{opacity:0.6;cursor:not-allowed}
+
+    /* footer hint */
+    .hint{font-size:12px;color:#94a3b8;padding-top:10px}
+
+    /* small screens tweaks */
+    @media (max-width:640px){
+      .card{padding:12px;border-radius:12px}
+      .bubble{max-width:92%}
+    }
+  </style>
+</head>
+<body>
+  <div class="money-bg" id="money-bg" aria-hidden="true"></div>
+
+  <main class="app">
+    <section class="card" role="application" aria-label="CampusBot chat">
+      <header>
+        <div>
+          <h1>CampusBot — Campus Info Assistant</h1>
+          <div class="sub">Ask about schedules, facilities, dining, library services, and admin procedures</div>
+        </div>
+        <div class="sub" id="session-id">Session: —</div>
+      </header>
+
+      <div class="chat-area" id="chatArea" role="log" aria-live="polite"></div>
+
+      <div class="controls">
+        <input id="input" type="text" placeholder="Type a question (e.g., 'What's today's menu at Central Cafeteria?')" aria-label="Your question" />
+        <button id="sendBtn">Send</button>
+      </div>
+      <div class="hint">Tip: this demo connects to <code>/api/converse</code> and <code>/api/session</code> from the starter backend. Replace endpoints if your server runs elsewhere.</div>
+    </section>
+  </main>
+
+  <script>
+    // --- Flying money generator ---
+    const bg = document.getElementById('money-bg');
+    const BILL_EMOJI = '💸'; // simple emoji bill — swap for image icons if you prefer
+
+    function spawnBill() {
+      const b = document.createElement('div');
+      b.className = 'bill';
+      b.textContent = BILL_EMOJI;
+
+      // randomized starting position and animation settings
+      const startX = Math.random() * 100; // percent of viewport width
+      const size = 14 + Math.random() * 36; // font size px
+      const rotate = (Math.random() * 60 - 30) + 'deg';
+      const drift = (Math.random() * 240 - 120) + 'px';
+      const duration = 8 + Math.random() * 8; // seconds
+      const delay = -(Math.random() * 6); // negative so some already in flight
+      const scale = (0.7 + Math.random() * 1.2).toFixed(2);
+
+      b.style.left = startX + 'vw';
+      b.style.fontSize = size + 'px';
+      b.style.setProperty('--x', (Math.random()*40-20)+'px');
+      b.style.setProperty('--r', rotate);
+      b.style.setProperty('--drift', drift);
+      b.style.setProperty('--s', scale);
+
+      b.style.animation = `floatUp ${duration}s linear ${delay}s forwards`;
+
+      bg.appendChild(b);
+
+      // cleanup after animation
+      setTimeout(() => {
+        b.remove();
+      }, (Math.abs(delay) + duration + 1) * 1000);
+    }
+
+    // spawn many bills over time
+    setInterval(() => {
+      // spawn between 1 and 3 per tick
+      const n = Math.random() < 0.6 ? 1 : 2;
+      for (let i=0;i<n;i++) spawnBill();
+    }, 600);
+
+    // initial burst
+    for (let i=0;i<12;i++) setTimeout(spawnBill, i*120);
+
+    // --- Simple chat logic (connects to provided backend) ---
+    const chatArea = document.getElementById('chatArea');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('sendBtn');
+    const sessionEl = document.getElementById('session-id');
+    let sessionId = null;
+
+    function appendMsg(text, who='assistant'){
+      const wrapper = document.createElement('div');
+      wrapper.className = 'msg ' + (who==='user' ? 'user' : 'assistant');
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = who === 'user' ? 'You' : 'CampusBot';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble ' + (who==='user' ? 'user' : '');
+      bubble.innerHTML = text.replace(/
+/g,'<br>');
+      wrapper.appendChild(bubble);
+      chatArea.appendChild(wrapper);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    async function createSession(){
+      try{
+        const resp = await fetch('/api/session', { method: 'POST' });
+        if(!resp.ok) throw new Error('session_failed');
+        const data = await resp.json();
+        sessionId = data.session_id;
+        sessionEl.textContent = 'Session: ' + sessionId.slice(0,8);
+      }catch(err){
+        sessionEl.textContent = 'Session: failed (check backend)';
+      }
+    }
+
+    async function sendMessage(){
+      const text = input.value.trim();
+      if(!text) return;
+      appendMsg(text, 'user');
+      input.value = '';
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Thinking...';
+      try{
+        const resp = await fetch('/api/converse', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ session_id: sessionId, message: text })
+        });
+        const data = await resp.json();
+        if(data && data.reply) appendMsg(data.reply, 'assistant');
+        else appendMsg('Sorry, I could not get a response.', 'assistant');
+      }catch(err){
+        appendMsg('Error contacting server. Make sure backend is running at /api.', 'assistant');
+      }finally{
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendMessage(); });
+
+    // init
+    createSession();
+
+    // small accessibility: focus on input
+    input.focus();
+  </script>
+</body>
+</html>
